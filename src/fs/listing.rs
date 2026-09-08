@@ -74,13 +74,13 @@ pub fn places() -> Vec<Place> {
         }
     };
 
-    push("Home", "user", home.clone());
-    push("Desktop", "folder-closed", user_dir("DESKTOP", "Desktop"));
+    push("Home", "house", home.clone());
+    push("Desktop", "monitor", user_dir("DESKTOP", "Desktop"));
     push("Documents", "file-text", user_dir("DOCUMENTS", "Documents"));
     push("Downloads", "arrow-down", user_dir("DOWNLOAD", "Downloads"));
-    push("Music", "star", user_dir("MUSIC", "Music"));
-    push("Pictures", "palette", user_dir("PICTURES", "Pictures"));
-    push("Videos", "play", user_dir("VIDEOS", "Videos"));
+    push("Music", "music", user_dir("MUSIC", "Music"));
+    push("Pictures", "image", user_dir("PICTURES", "Pictures"));
+    push("Videos", "monitor-play", user_dir("VIDEOS", "Videos"));
     items.push(Place {
         label: "Root".into(),
         icon: "hard-drive".into(),

@@ -18,6 +18,7 @@ use pifile::fs::{
     copy_file, delete_permanent, home_dir, initial_cwd, list_dir, mkdir, move_path, parent_of,
     places, rename, trash_path, DirEntry, FileKind, Place, SortKey,
 };
+use pifile::icons::PlaceIcon as PifileIcon;
 use pifile::theme::{detect_system_dark, omarchy_watch_paths, OmarchyPalette};
 
 actions!(
@@ -491,7 +492,7 @@ impl Render for Pifile {
                 let active = place.path == self.cwd;
                 let path = place.path.clone();
                 let label = place.label.clone();
-                let icon = place.icon.clone();
+                let icon = place_icon(&place.icon);
                 h_flex()
                     .id(SharedString::from(format!("place-{}", label)))
                     .px_3()
@@ -512,8 +513,7 @@ impl Render for Pifile {
                         }),
                     )
                     .child(
-                        Icon::default()
-                            .path(SharedString::from(format!("icons/{icon}.svg")))
+                        Icon::new(icon)
                             .small()
                             .text_color(if active { accent } else { muted }),
                     )
@@ -756,6 +756,21 @@ fn spawn_detached(cmd: &mut std::process::Command) -> std::io::Result<()> {
         .stderr(Stdio::null())
         .spawn()
         .map(|_| ())
+}
+
+/// Map a place's icon name to the vendored Lucide icon.
+fn place_icon(name: &str) -> PifileIcon {
+    match name {
+        "house" => PifileIcon::House,
+        "monitor" => PifileIcon::Monitor,
+        "file-text" => PifileIcon::FileText,
+        "arrow-down" => PifileIcon::ArrowDown,
+        "music" => PifileIcon::Music,
+        "image" => PifileIcon::Image,
+        "monitor-play" => PifileIcon::MonitorPlay,
+        "hard-drive" => PifileIcon::HardDrive,
+        _ => PifileIcon::House,
+    }
 }
 
 fn apply_palette(palette: &OmarchyPalette, window: Option<&mut Window>, cx: &mut App) {

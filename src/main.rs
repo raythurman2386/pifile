@@ -1,11 +1,12 @@
 mod app;
 
+use pifile::icons::PifileAssets;
 use std::path::PathBuf;
 
 fn main() {
     let open_path = std::env::args().nth(1).map(PathBuf::from);
 
-    let app = gpui_kit::application().with_assets(gpui_kit::assets::Assets);
+    let app = gpui_kit::application().with_assets(PifileAssets);
     app.run(move |cx| {
         gpui_kit::init(cx);
         app::init(cx);

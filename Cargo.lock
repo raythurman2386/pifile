@@ -5026,6 +5026,7 @@ dependencies = [
  "gpui-kit",
  "notify 8.2.0",
  "open",
+ "rust-embed",
  "thiserror 2.0.20",
  "trash",
 ]
