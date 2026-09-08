@@ -48,20 +48,65 @@ pub fn home_dir() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("/"))
 }
 
-pub fn places() -> Vec<(String, PathBuf)> {
-    let mut items = Vec::new();
+/// A sidebar location: label, icon name, and target path.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Place {
+    pub label: String,
+    pub icon: String,
+    pub path: PathBuf,
+}
+
+/// Sidebar entries: `(label, icon, path)`. Standard XDG user dirs come from
+/// `xdg-user-dir` when available (respects localization), falling back to the
+/// conventional names; every entry is skipped when the directory does not
+/// exist, except Root.
+pub fn places() -> Vec<Place> {
     let home = home_dir();
-    push_if_dir(&mut items, "Home", home.clone());
-    push_if_dir(&mut items, "Downloads", home.join("Downloads"));
-    push_if_dir(&mut items, "Documents", home.join("Documents"));
-    push_if_dir(&mut items, "Desktop", home.join("Desktop"));
-    items.push(("Root".into(), PathBuf::from("/")));
+    let mut items = Vec::new();
+
+    let mut push = |label: &str, icon: &str, path: PathBuf| {
+        if path.is_dir() {
+            items.push(Place {
+                label: label.into(),
+                icon: icon.into(),
+                path,
+            });
+        }
+    };
+
+    push("Home", "user", home.clone());
+    push("Desktop", "folder-closed", user_dir("DESKTOP", "Desktop"));
+    push("Documents", "file-text", user_dir("DOCUMENTS", "Documents"));
+    push("Downloads", "arrow-down", user_dir("DOWNLOAD", "Downloads"));
+    push("Music", "star", user_dir("MUSIC", "Music"));
+    push("Pictures", "palette", user_dir("PICTURES", "Pictures"));
+    push("Videos", "play", user_dir("VIDEOS", "Videos"));
+    items.push(Place {
+        label: "Root".into(),
+        icon: "hard-drive".into(),
+        path: PathBuf::from("/"),
+    });
     items
 }
 
-fn push_if_dir(items: &mut Vec<(String, PathBuf)>, label: &str, path: PathBuf) {
-    if path.is_dir() {
-        items.push((label.into(), path));
+fn user_dir(name: &str, fallback: &str) -> PathBuf {
+    let dir = home_dir();
+    match std::process::Command::new("xdg-user-dir")
+        .arg(name)
+        .output()
+    {
+        Ok(output) if output.status.success() => {
+            let raw = String::from_utf8_lossy(&output.stdout);
+            let raw = raw.trim();
+            let path = PathBuf::from(raw);
+            // Unset entries echo the home directory itself.
+            if raw.is_empty() || path == dir {
+                dir.join(fallback)
+            } else {
+                path
+            }
+        }
+        _ => dir.join(fallback),
     }
 }
 
@@ -82,4 +127,37 @@ pub fn initial_cwd() -> PathBuf {
         .ok()
         .filter(|p| p.is_dir())
         .unwrap_or_else(home_dir)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn places_are_unique_dirs() {
+        let items = places();
+        assert!(
+            items.iter().any(|p| p.path.as_path() == Path::new("/")),
+            "Root must always be present"
+        );
+        let mut seen = std::collections::HashSet::new();
+        for place in &items {
+            assert!(place.path.is_dir(), "{} must exist", place.path.display());
+            assert!(
+                seen.insert(place.path.clone()),
+                "duplicate place {}",
+                place.path.display()
+            );
+            assert!(!place.icon.is_empty());
+            assert!(!place.label.is_empty());
+        }
+    }
+
+    #[test]
+    fn user_dir_falls_back_to_conventional_name() {
+        // A non-existent xdg-user-dir binary must not panic.
+        std::env::set_var("PATH", "/nonexistent");
+        let dir = home_dir();
+        assert_eq!(user_dir("MUSIC", "Music"), dir.join("Music"));
+    }
 }

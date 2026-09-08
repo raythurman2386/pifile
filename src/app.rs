@@ -8,7 +8,7 @@ use gpui_kit::component::{
     input::{Input, InputState},
     label::Label,
     list::{List, ListDelegate, ListEvent, ListItem, ListState},
-    v_flex, ActiveTheme, Icon, IconName, IndexPath, Root, Theme, ThemeMode,
+    v_flex, ActiveTheme, Icon, IconName, IndexPath, Root, Sizable as _, Theme, ThemeMode,
 };
 use gpui_kit::prelude::FluentBuilder;
 use gpui_kit::*;
@@ -16,7 +16,7 @@ use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 
 use pifile::fs::{
     copy_file, delete_permanent, home_dir, initial_cwd, list_dir, mkdir, move_path, parent_of,
-    places, rename, trash_path, DirEntry, FileKind, SortKey,
+    places, rename, trash_path, DirEntry, FileKind, Place, SortKey,
 };
 use pifile::theme::{detect_system_dark, omarchy_watch_paths, OmarchyPalette};
 
@@ -161,7 +161,7 @@ impl DirDelegate {
 
 pub struct Pifile {
     palette: OmarchyPalette,
-    places: Vec<(String, PathBuf)>,
+    places: Vec<Place>,
     cwd: PathBuf,
     show_hidden: bool,
     sort: SortKey,
@@ -485,21 +485,39 @@ impl Render for Pifile {
                     .text_sm()
                     .text_color(muted)
                     .px_3()
-                    .py_1(),
+                    .pb_1(),
             )
-            .children(self.places.iter().map(|(label, path)| {
-                let active = *path == self.cwd;
-                let path = path.clone();
-                Button::new(SharedString::from(format!("place-{label}")))
-                    .ghost()
-                    .label(label.clone())
-                    .w_full()
-                    .when(active, |b| {
-                        b.text_color(accent).bg(page.blend(accent.opacity(0.14)))
+            .children(self.places.iter().map(|place| {
+                let active = place.path == self.cwd;
+                let path = place.path.clone();
+                let label = place.label.clone();
+                let icon = place.icon.clone();
+                h_flex()
+                    .id(SharedString::from(format!("place-{}", label)))
+                    .px_3()
+                    .py_1()
+                    .gap_2()
+                    .items_center()
+                    .rounded_sm()
+                    .mx_1()
+                    .text_color(fg)
+                    .when(active, |row| {
+                        row.bg(page.blend(accent.opacity(0.14))).text_color(accent)
                     })
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.set_cwd(path.clone(), window, cx);
-                    }))
+                    .hover(|row| row.bg(page.blend(accent.opacity(0.08))))
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(move |this, _, window, cx| {
+                            this.set_cwd(path.clone(), window, cx);
+                        }),
+                    )
+                    .child(
+                        Icon::default()
+                            .path(SharedString::from(format!("icons/{icon}.svg")))
+                            .small()
+                            .text_color(if active { accent } else { muted }),
+                    )
+                    .child(Label::new(label).text_sm())
             }));
 
         let toolbar =
