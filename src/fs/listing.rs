@@ -28,8 +28,8 @@ pub fn list_dir(path: &Path, show_hidden: bool, sort: SortKey) -> std::io::Resul
         }
         entries.push(entry);
     }
-    entries.sort_by(|a, b| {
-        match (a.kind == FileKind::Directory, b.kind == FileKind::Directory) {
+    entries.sort_by(
+        |a, b| match (a.kind == FileKind::Directory, b.kind == FileKind::Directory) {
             (true, false) => std::cmp::Ordering::Less,
             (false, true) => std::cmp::Ordering::Greater,
             _ => match sort {
@@ -37,8 +37,8 @@ pub fn list_dir(path: &Path, show_hidden: bool, sort: SortKey) -> std::io::Resul
                 SortKey::Size => a.size.unwrap_or(0).cmp(&b.size.unwrap_or(0)),
                 SortKey::Modified => a.modified.cmp(&b.modified),
             },
-        }
-    });
+        },
+    );
     Ok(entries)
 }
 

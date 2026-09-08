@@ -22,6 +22,7 @@ anyhow = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 directories = "6"
 gpui-kit = "0.6"
+notify = "8"
 open = "5"
 thiserror = "2"
 trash = "5"

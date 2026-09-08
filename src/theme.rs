@@ -135,9 +135,7 @@ pub fn colors_candidates() -> Vec<PathBuf> {
         paths.push(dir.join("theme.conf"));
     }
     paths.push(omarchy_colors_path());
-    paths.push(
-        home.join(".local/state/omarchy/current/theme/theme.conf"),
-    );
+    paths.push(home.join(".local/state/omarchy/current/theme/theme.conf"));
     paths.push(home.join(".config/omarchy/current/theme/colors.toml"));
     paths.push(home.join(".config/omarchy/current/theme/theme.conf"));
     paths.push(home.join(".local/state/pimarchy/current/theme/colors.toml"));

@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -6,8 +6,9 @@ use gpui_kit::component::{
     button::{Button, ButtonVariants as _},
     h_flex,
     input::{Input, InputState},
+    label::Label,
     list::{List, ListDelegate, ListEvent, ListItem, ListState},
-    v_flex, ActiveTheme, Icon, IconName, IndexPath, Label, Root, Theme, ThemeMode,
+    v_flex, ActiveTheme, Icon, IconName, IndexPath, Root, Theme, ThemeMode,
 };
 use gpui_kit::prelude::FluentBuilder;
 use gpui_kit::*;
@@ -191,9 +192,7 @@ impl Pifile {
         let entries = list_dir(&cwd, false, SortKey::Name).unwrap_or_default();
         let selected = (!entries.is_empty()).then(IndexPath::default);
         let count = entries.len();
-        let list = cx.new(|cx| {
-            ListState::new(DirDelegate { entries, selected }, window, cx)
-        });
+        let list = cx.new(|cx| ListState::new(DirDelegate { entries, selected }, window, cx));
         let prompt_input = cx.new(|cx| InputState::new(window, cx).placeholder("Name"));
         apply_palette(&palette, Some(window), cx);
         window.set_window_title(&format!("Pifile — {}", cwd.display()));
@@ -218,18 +217,23 @@ impl Pifile {
             last_theme_check: Instant::now(),
             _subs: Vec::new(),
         };
-        this._subs
-            .push(cx.subscribe(&list, |this, _, ev: &ListEvent, cx| match ev {
-                ListEvent::Select(ix) => {
-                    this.selected = Some(*ix);
-                    cx.notify();
-                }
-                ListEvent::Confirm(ix) => {
-                    this.selected = Some(*ix);
-                    this.open_selected(cx);
-                }
-                ListEvent::Cancel => {}
-            }));
+        this._subs.push(
+            cx.subscribe_in(
+                &list,
+                window,
+                |this, _, ev: &ListEvent, window, cx| match ev {
+                    ListEvent::Select(ix) => {
+                        this.selected = Some(*ix);
+                        cx.notify();
+                    }
+                    ListEvent::Confirm(ix) => {
+                        this.selected = Some(*ix);
+                        this.open_selected(window, cx);
+                    }
+                    ListEvent::Cancel => {}
+                },
+            ),
+        );
         this
     }
 
@@ -273,7 +277,7 @@ impl Pifile {
         }
     }
 
-    fn open_selected(&mut self, cx: &mut Context<Self>) {
+    fn open_selected(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(entry) = self.selected_entry(cx) else {
             return;
         };
@@ -420,7 +424,11 @@ impl Render for Pifile {
         let muted = hex_to_hsla(self.palette.muted()).unwrap_or(cx.theme().muted_foreground);
         let surface = hex_to_hsla(&self.palette.selection).unwrap_or(cx.theme().secondary);
         let cwd = self.cwd.display().to_string();
-        let hidden_label = if self.show_hidden { "Hide dotfiles" } else { "Show hidden" };
+        let hidden_label = if self.show_hidden {
+            "Hide dotfiles"
+        } else {
+            "Show hidden"
+        };
 
         let sidebar = v_flex()
             .w(px(196.))
@@ -428,7 +436,13 @@ impl Render for Pifile {
             .flex_shrink_0()
             .bg(surface)
             .py_2()
-            .child(Label::new("Places").text_sm().text_color(muted).px_3().py_1())
+            .child(
+                Label::new("Places")
+                    .text_sm()
+                    .text_color(muted)
+                    .px_3()
+                    .py_1(),
+            )
             .children(self.places.iter().map(|(label, path)| {
                 let active = *path == self.cwd;
                 let path = path.clone();
@@ -442,42 +456,75 @@ impl Render for Pifile {
                     }))
             }));
 
-        let toolbar = h_flex()
-            .w_full()
-            .px_2()
-            .py_1()
-            .gap_2()
-            .items_center()
-            .bg(surface)
-            .child(Button::new("up").ghost().icon(IconName::ArrowUp).on_click(cx.listener(|this, _, window, cx| this.go_parent(window, cx))))
-            .child(Button::new("home").ghost().icon(IconName::Folder).on_click(cx.listener(|this, _, window, cx| this.set_cwd(home_dir(), window, cx))))
-            .child(Button::new("refresh").ghost().icon(IconName::Redo).on_click(cx.listener(|this, _, window, cx| this.reload(window, cx))))
-            .child(Button::new("new-dir").ghost().icon(IconName::Plus).on_click(cx.listener(|this, _, window, cx| this.begin_prompt(PromptKind::NewFolder, window, cx))))
-            .child(div().flex_1().child(Label::new(cwd).text_sm()))
-            .child(Button::new("hidden").ghost().label(hidden_label).on_click(cx.listener(|this, _, window, cx| {
-                this.show_hidden = !this.show_hidden;
-                this.reload(window, cx);
-            })));
-
-        let prompt_bar = self.prompt.map(|kind| {
-            let label = match kind {
-                PromptKind::NewFolder => "New folder",
-                PromptKind::Rename => "Rename",
-            };
+        let toolbar =
             h_flex()
                 .w_full()
                 .px_2()
                 .py_1()
                 .gap_2()
                 .items_center()
-                .child(Label::new(label).text_sm())
-                .child(div().flex_1().child(Input::new(&self.prompt_input)))
-                .child(Button::new("prompt-ok").primary().label("OK").on_click(cx.listener(|this, _, window, cx| this.confirm_prompt(window, cx))))
-                .child(Button::new("prompt-cancel").ghost().label("Cancel").on_click(cx.listener(|this, _, _, cx| {
-                    this.prompt = None;
-                    cx.notify();
-                })))
-        });
+                .bg(surface)
+                .child(
+                    Button::new("up")
+                        .ghost()
+                        .icon(IconName::ArrowUp)
+                        .on_click(cx.listener(|this, _, window, cx| this.go_parent(window, cx))),
+                )
+                .child(Button::new("home").ghost().icon(IconName::Folder).on_click(
+                    cx.listener(|this, _, window, cx| this.set_cwd(home_dir(), window, cx)),
+                ))
+                .child(
+                    Button::new("refresh")
+                        .ghost()
+                        .icon(IconName::Redo)
+                        .on_click(cx.listener(|this, _, window, cx| this.reload(window, cx))),
+                )
+                .child(
+                    Button::new("new-dir")
+                        .ghost()
+                        .icon(IconName::Plus)
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            this.begin_prompt(PromptKind::NewFolder, window, cx)
+                        })),
+                )
+                .child(div().flex_1().child(Label::new(cwd).text_sm()))
+                .child(
+                    Button::new("hidden")
+                        .ghost()
+                        .label(hidden_label)
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            this.show_hidden = !this.show_hidden;
+                            this.reload(window, cx);
+                        })),
+                );
+
+        let prompt_bar =
+            self.prompt.map(|kind| {
+                let label = match kind {
+                    PromptKind::NewFolder => "New folder",
+                    PromptKind::Rename => "Rename",
+                };
+                h_flex()
+                    .w_full()
+                    .px_2()
+                    .py_1()
+                    .gap_2()
+                    .items_center()
+                    .child(Label::new(label).text_sm())
+                    .child(div().flex_1().child(Input::new(&self.prompt_input)))
+                    .child(Button::new("prompt-ok").primary().label("OK").on_click(
+                        cx.listener(|this, _, window, cx| this.confirm_prompt(window, cx)),
+                    ))
+                    .child(
+                        Button::new("prompt-cancel")
+                            .ghost()
+                            .label("Cancel")
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.prompt = None;
+                                cx.notify();
+                            })),
+                    )
+            });
 
         v_flex()
             .id("pifile")
@@ -489,7 +536,7 @@ impl Render for Pifile {
                 if this.prompt.is_some() {
                     this.confirm_prompt(window, cx);
                 } else {
-                    this.open_selected(cx);
+                    this.open_selected(window, cx);
                 }
             }))
             .on_action(cx.listener(|this, _: &OpenWithSystem, _, cx| {
@@ -499,10 +546,20 @@ impl Render for Pifile {
                     }
                 }
             }))
-            .on_action(cx.listener(|this, _: &NewFolder, window, cx| this.begin_prompt(PromptKind::NewFolder, window, cx)))
-            .on_action(cx.listener(|this, _: &RenameSelected, window, cx| this.begin_prompt(PromptKind::Rename, window, cx)))
-            .on_action(cx.listener(|this, _: &TrashSelected, window, cx| this.trash_selected(window, cx)))
-            .on_action(cx.listener(|this, _: &DeleteSelected, window, cx| this.delete_selected(window, cx)))
+            .on_action(cx.listener(|this, _: &NewFolder, window, cx| {
+                this.begin_prompt(PromptKind::NewFolder, window, cx)
+            }))
+            .on_action(cx.listener(|this, _: &RenameSelected, window, cx| {
+                this.begin_prompt(PromptKind::Rename, window, cx)
+            }))
+            .on_action(
+                cx.listener(|this, _: &TrashSelected, window, cx| this.trash_selected(window, cx)),
+            )
+            .on_action(
+                cx.listener(|this, _: &DeleteSelected, window, cx| {
+                    this.delete_selected(window, cx)
+                }),
+            )
             .on_action(cx.listener(|this, _: &CopySelected, _, cx| this.copy_selected(false, cx)))
             .on_action(cx.listener(|this, _: &CutSelected, _, cx| this.copy_selected(true, cx)))
             .on_action(cx.listener(|this, _: &PasteClipboard, window, cx| this.paste(window, cx)))
@@ -511,8 +568,14 @@ impl Render for Pifile {
                 this.reload(window, cx);
             }))
             .on_action(cx.listener(|this, _: &Refresh, window, cx| this.reload(window, cx)))
-            .on_action(cx.listener(|this, _: &SelectHome, window, cx| this.set_cwd(home_dir(), window, cx)))
-            .on_action(cx.listener(|this, _: &ConfirmPrompt, window, cx| this.confirm_prompt(window, cx)))
+            .on_action(
+                cx.listener(|this, _: &SelectHome, window, cx| {
+                    this.set_cwd(home_dir(), window, cx)
+                }),
+            )
+            .on_action(
+                cx.listener(|this, _: &ConfirmPrompt, window, cx| this.confirm_prompt(window, cx)),
+            )
             .on_action(cx.listener(|this, _: &CancelPrompt, _, cx| {
                 this.prompt = None;
                 cx.notify();
@@ -522,23 +585,21 @@ impl Render for Pifile {
                 cx.quit();
             }))
             .child(
-                h_flex()
-                    .flex_1()
-                    .size_full()
-                    .child(sidebar)
-                    .child(
-                        v_flex()
-                            .flex_1()
-                            .h_full()
-                            .child(toolbar)
-                            .children(prompt_bar)
-                            .child(List::new(&self.list).flex_1())
-                            .child(
-                                h_flex().w_full().px_3().py_1().child(
-                                    Label::new(self.status.clone()).text_sm().text_color(muted),
-                                ),
-                            ),
-                    ),
+                h_flex().flex_1().size_full().child(sidebar).child(
+                    v_flex()
+                        .flex_1()
+                        .h_full()
+                        .child(toolbar)
+                        .children(prompt_bar)
+                        .child(List::new(&self.list).flex_1())
+                        .child(
+                            h_flex()
+                                .w_full()
+                                .px_3()
+                                .py_1()
+                                .child(Label::new(self.status.clone()).text_sm().text_color(muted)),
+                        ),
+                ),
             )
     }
 }
@@ -576,8 +637,16 @@ impl ListDelegate for DirDelegate {
                                 .child(Icon::new(icon))
                                 .child(Label::new(file.name.clone())),
                         )
-                        .child(Label::new(file.size_label()).text_sm().text_color(cx.theme().muted_foreground))
-                        .child(Label::new(file.modified_label()).text_sm().text_color(cx.theme().muted_foreground)),
+                        .child(
+                            Label::new(file.size_label())
+                                .text_sm()
+                                .text_color(cx.theme().muted_foreground),
+                        )
+                        .child(
+                            Label::new(file.modified_label())
+                                .text_sm()
+                                .text_color(cx.theme().muted_foreground),
+                        ),
                 )
                 .selected(Some(ix) == self.selected)
         })
@@ -596,7 +665,11 @@ impl ListDelegate for DirDelegate {
 
 fn apply_palette(palette: &OmarchyPalette, window: Option<&mut Window>, cx: &mut App) {
     Theme::change(
-        if palette.dark { ThemeMode::Dark } else { ThemeMode::Light },
+        if palette.dark {
+            ThemeMode::Dark
+        } else {
+            ThemeMode::Light
+        },
         window,
         cx,
     );
