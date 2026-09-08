@@ -305,7 +305,10 @@ impl Pifile {
 
     /// Launch the file's default application. `open::that` blocks until the
     /// launched process exits — a terminal editor means the UI freezes — so
-    /// the launcher is spawned detached on a background thread.
+    /// the launcher runs on a background thread. `gio open` is preferred over
+    /// `xdg-open` because xdg-open's generic branch executes `Terminal=true`
+    /// desktop entries directly (`env nvim …`) instead of opening a terminal,
+    /// which orphans the editor when the caller has no TTY.
     fn open_with_system(&mut self, path: &std::path::Path, cx: &mut Context<Self>) {
         self.set_status(format!("opening {}…", path.display()), cx);
         let path = path.to_path_buf();
@@ -313,7 +316,23 @@ impl Pifile {
             .file_name()
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_else(|| path.display().to_string());
-        let task = cx.background_spawn(async move { open::that_detached(&path) });
+        let task = cx.background_spawn(async move {
+            let mut commands = Vec::new();
+            let mut gio = std::process::Command::new("gio");
+            gio.arg("open").arg(&path);
+            commands.push(gio);
+            let mut xdg = std::process::Command::new("xdg-open");
+            xdg.arg(&path);
+            commands.push(xdg);
+            let mut last_err = None;
+            for mut cmd in commands {
+                match spawn_detached(&mut cmd) {
+                    Ok(()) => return Ok(()),
+                    Err(err) => last_err = Some(err),
+                }
+            }
+            Err(last_err.unwrap_or_else(|| std::io::Error::other("no launcher available")))
+        });
         cx.spawn(async move |this, cx| {
             let result = task.await;
             this.update(cx, |this, cx| match result {
@@ -691,6 +710,34 @@ impl ListDelegate for DirDelegate {
         self.selected = ix;
         cx.notify();
     }
+}
+
+/// Launch `cmd` detached from this process: stdio goes to /dev/null and the
+/// child gets its own process group, so the launcher outlives the window and
+/// the UI thread never waits on it.
+#[cfg(unix)]
+fn spawn_detached(cmd: &mut std::process::Command) -> std::io::Result<()> {
+    use std::os::unix::process::CommandExt as _;
+    use std::process::Stdio;
+
+    cmd.stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .process_group(0)
+        .spawn()
+        .map(|_| ())
+}
+
+/// Non-Unix fallback: detach via null stdio only.
+#[cfg(not(unix))]
+fn spawn_detached(cmd: &mut std::process::Command) -> std::io::Result<()> {
+    use std::process::Stdio;
+
+    cmd.stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map(|_| ())
 }
 
 fn apply_palette(palette: &OmarchyPalette, window: Option<&mut Window>, cx: &mut App) {
