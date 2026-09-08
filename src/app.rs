@@ -298,9 +298,31 @@ impl Pifile {
                 }
                 Err(err) => self.set_status(format!("error: {err}"), cx),
             }
-        } else if let Err(err) = open::that(&entry.path) {
-            self.set_status(format!("{err}"), cx);
+        } else {
+            self.open_with_system(&entry.path, cx);
         }
+    }
+
+    /// Launch the file's default application. `open::that` blocks until the
+    /// launched process exits — a terminal editor means the UI freezes — so
+    /// the launcher is spawned detached on a background thread.
+    fn open_with_system(&mut self, path: &std::path::Path, cx: &mut Context<Self>) {
+        self.set_status(format!("opening {}…", path.display()), cx);
+        let path = path.to_path_buf();
+        let name = path
+            .file_name()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_else(|| path.display().to_string());
+        let task = cx.background_spawn(async move { open::that_detached(&path) });
+        cx.spawn(async move |this, cx| {
+            let result = task.await;
+            this.update(cx, |this, cx| match result {
+                Ok(()) => this.set_status(format!("opened {name}"), cx),
+                Err(err) => this.set_status(format!("open {name}: {err:#}"), cx),
+            })
+            .ok();
+        })
+        .detach();
     }
 
     fn trash_selected(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -548,9 +570,7 @@ impl Render for Pifile {
             }))
             .on_action(cx.listener(|this, _: &OpenWithSystem, _, cx| {
                 if let Some(entry) = this.selected_entry(cx) {
-                    if let Err(err) = open::that(&entry.path) {
-                        this.set_status(format!("{err}"), cx);
-                    }
+                    this.open_with_system(&entry.path, cx);
                 }
             }))
             .on_action(cx.listener(|this, _: &NewFolder, window, cx| {
