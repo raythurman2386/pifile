@@ -50,6 +50,13 @@ First existing `colors.toml` or `theme.conf` wins:
 5. `~/.config/pimarchy/current/theme`
 6. built-in Omarchy fallback (`#101010` / `#eeeeee` / `#5584aa`)
 
+The whole window follows one tonal family: the file area paints with
+`background`/`foreground`, panels (sidebar, toolbar, status bar) with
+`lighter_background`, and secondary text with `muted`. Themes without those
+keys get them derived from `background`/`foreground`. Selected rows and the
+active place use a translucent `accent` wash, and `selection` (often a light
+text-highlight color) is never used as a panel background.
+
 ## Shortcuts
 
 | Action | Key |

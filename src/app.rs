@@ -421,8 +421,9 @@ impl Render for Pifile {
         self.poll_theme(window, cx);
         let page = hex_to_hsla(&self.palette.background).unwrap_or(cx.theme().background);
         let fg = hex_to_hsla(&self.palette.foreground).unwrap_or(cx.theme().foreground);
-        let muted = hex_to_hsla(self.palette.muted()).unwrap_or(cx.theme().muted_foreground);
-        let surface = hex_to_hsla(&self.palette.selection).unwrap_or(cx.theme().secondary);
+        let muted = hex_to_hsla(&self.palette.muted).unwrap_or(cx.theme().muted_foreground);
+        let surface = hex_to_hsla(&self.palette.surface).unwrap_or(cx.theme().secondary);
+        let accent = hex_to_hsla(&self.palette.accent).unwrap_or(cx.theme().primary);
         let cwd = self.cwd.display().to_string();
         let hidden_label = if self.show_hidden {
             "Hide dotfiles"
@@ -435,6 +436,8 @@ impl Render for Pifile {
             .h_full()
             .flex_shrink_0()
             .bg(surface)
+            .border_r_1()
+            .border_color(page.blend(fg.opacity(0.08)))
             .py_2()
             .child(
                 Label::new("Places")
@@ -450,7 +453,9 @@ impl Render for Pifile {
                     .ghost()
                     .label(label.clone())
                     .w_full()
-                    .when(active, |b| b.primary())
+                    .when(active, |b| {
+                        b.text_color(accent).bg(page.blend(accent.opacity(0.14)))
+                    })
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.set_cwd(path.clone(), window, cx);
                     }))
@@ -464,6 +469,8 @@ impl Render for Pifile {
                 .gap_2()
                 .items_center()
                 .bg(surface)
+                .border_b_1()
+                .border_color(page.blend(fg.opacity(0.08)))
                 .child(
                     Button::new("up")
                         .ghost()
@@ -597,6 +604,9 @@ impl Render for Pifile {
                                 .w_full()
                                 .px_3()
                                 .py_1()
+                                .bg(surface)
+                                .border_t_1()
+                                .border_color(page.blend(fg.opacity(0.08)))
                                 .child(Label::new(self.status.clone()).text_sm().text_color(muted)),
                         ),
                 ),
@@ -674,15 +684,34 @@ fn apply_palette(palette: &OmarchyPalette, window: Option<&mut Window>, cx: &mut
         cx,
     );
     let theme = Theme::global_mut(cx);
-    if let Some(bg) = hex_to_hsla(&palette.background) {
+    let bg = hex_to_hsla(&palette.background);
+    let fg = hex_to_hsla(&palette.foreground);
+    if let Some(bg) = bg {
         theme.background = bg;
     }
-    if let Some(fg) = hex_to_hsla(&palette.foreground) {
+    if let Some(fg) = fg {
         theme.foreground = fg;
     }
     if let Some(accent) = hex_to_hsla(&palette.accent) {
         theme.primary = accent;
         theme.accent = accent;
+    }
+    if let Some(surface) = hex_to_hsla(&palette.surface) {
+        // Panels share the file area's tonal family: same hue, one step up.
+        theme.secondary = surface;
+        theme.sidebar = surface;
+    }
+    if let Some(muted) = hex_to_hsla(&palette.muted) {
+        theme.muted_foreground = muted;
+        theme.sidebar_foreground = muted;
+    }
+    if let (Some(bg), Some(accent_hex)) = (bg, hex_to_hsla(&palette.accent)) {
+        // Row highlight: a translucent wash of the accent over the background,
+        // with foreground text always readable on top.
+        theme.list_active = bg.blend(accent_hex.opacity(0.18));
+        theme.list_active_border = bg.blend(accent_hex.opacity(0.55));
+        theme.list_hover = bg.blend(accent_hex.opacity(0.08));
+        theme.selection = bg.blend(accent_hex.opacity(0.18));
     }
     Theme::sync_base(cx);
 }

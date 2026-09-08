@@ -46,6 +46,11 @@ pub struct OmarchyPalette {
     pub foreground: String,
     pub accent: String,
     pub selection: String,
+    /// Raised panel color (sidebar, toolbar, status bar): the theme's
+    /// `lighter_background`, derived from background/foreground when absent.
+    pub surface: String,
+    /// Secondary text color: the theme's `muted`, derived when absent.
+    pub muted: String,
 }
 
 impl OmarchyPalette {
@@ -57,6 +62,8 @@ impl OmarchyPalette {
                 foreground: "#eeeeee".into(),
                 accent: "#5584aa".into(),
                 selection: "#186a9a".into(),
+                surface: "#181818".into(),
+                muted: "#909191".into(),
             }
         } else {
             Self {
@@ -65,15 +72,9 @@ impl OmarchyPalette {
                 foreground: "#222324".into(),
                 accent: "#2077b2".into(),
                 selection: "#2077b2".into(),
+                surface: "#f2f2f2".into(),
+                muted: "#6b6f75".into(),
             }
-        }
-    }
-
-    pub fn muted(&self) -> &'static str {
-        if self.dark {
-            "#909191"
-        } else {
-            "#aeb1b5"
         }
     }
 
@@ -92,6 +93,8 @@ impl OmarchyPalette {
             return palette;
         };
         let mut mode = String::new();
+        let mut saw_surface = false;
+        let mut saw_muted = false;
         for line in raw.lines() {
             let line = line.trim();
             if line.is_empty() || line.starts_with('#') {
@@ -108,6 +111,14 @@ impl OmarchyPalette {
                 "foreground" | "COLOR_TEXT" => palette.foreground = value,
                 "accent" | "COLOR_PRIMARY" => palette.accent = value,
                 "selection" | "COLOR_SURFACE" => palette.selection = value,
+                "lighter_background" => {
+                    palette.surface = value;
+                    saw_surface = true;
+                }
+                "muted" | "dark_foreground" | "COLOR_SUBTEXT" => {
+                    palette.muted = value;
+                    saw_muted = true;
+                }
                 _ => {}
             }
         }
@@ -118,8 +129,39 @@ impl OmarchyPalette {
         } else if let Some(bg) = parse_hex_color(&palette.background) {
             palette.dark = bg.luminance() < 0.5;
         }
+        palette.derive_missing(saw_surface, saw_muted);
         palette
     }
+
+    /// Fill surface and muted from the base colors when the theme file does
+    /// not provide them, so panels stay in the theme's own tonal family.
+    fn derive_missing(&mut self, saw_surface: bool, saw_muted: bool) {
+        let (Some(bg), Some(fg)) = (
+            parse_hex_color(&self.background),
+            parse_hex_color(&self.foreground),
+        ) else {
+            return;
+        };
+        if !saw_surface {
+            // Surface: nudge the background ~12% toward the foreground.
+            self.surface = mix_hex(&bg, &fg, 0.12);
+        }
+        if !saw_muted {
+            // Muted text: foreground pulled ~40% back toward the background.
+            self.muted = mix_hex(&fg, &bg, 0.4);
+        }
+    }
+}
+
+/// Mix two colors: `t` is the weight of the second color.
+fn mix_hex(from: &RgbaColor, to: &RgbaColor, t: f32) -> String {
+    let mix = |a: f32, b: f32| ((a * (1.0 - t) + b * t) * 255.0).round() as u8;
+    format!(
+        "#{:02x}{:02x}{:02x}",
+        mix(from.r, to.r),
+        mix(from.g, to.g),
+        mix(from.b, to.b)
+    )
 }
 
 pub fn omarchy_colors_path() -> PathBuf {
@@ -210,7 +252,27 @@ mod tests {
         assert_eq!(palette.foreground, "#101010");
         assert_eq!(palette.accent, "#112233");
         assert_eq!(palette.selection, "#445566");
+        // No surface/muted keys in the file: derived from background/foreground.
+        assert_eq!(palette.surface, "#e1e1e1");
+        assert_eq!(palette.muted, "#6f6f6f");
         assert!(!palette.dark);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn loads_surface_and_muted_keys() {
+        let dir = std::env::temp_dir().join(format!("pifile-surface-{}", std::process::id()));
+        let _ = fs::create_dir_all(&dir);
+        let path = dir.join("colors.toml");
+        let mut file = fs::File::create(&path).unwrap();
+        file.write_all(
+            b"mode = \"dark\"\nbackground = \"#222822\"\nforeground = \"#e8d5b7\"\naccent = \"#4ade80\"\nselection = \"#e8d5b7\"\nlighter_background = \"#2d3830\"\nmuted = \"#7f897d\"\n",
+        )
+        .unwrap();
+        let palette = OmarchyPalette::from_colors_file(&path, false);
+        assert_eq!(palette.surface, "#2d3830");
+        assert_eq!(palette.muted, "#7f897d");
+        assert!(palette.dark);
         let _ = fs::remove_dir_all(&dir);
     }
 
