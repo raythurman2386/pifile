@@ -1,0 +1,37 @@
+[package]
+name = "pifile"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "A keyboard-first file manager built with GPUI Kit"
+repository = "https://github.com/raythurman2386/pifile"
+readme = "README.md"
+keywords = ["files", "file-manager", "gpui"]
+categories = ["gui"]
+
+[lib]
+name = "pifile"
+path = "src/lib.rs"
+
+[[bin]]
+name = "pifile"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+directories = "6"
+gpui-kit = "0.6"
+open = "5"
+thiserror = "2"
+trash = "5"
+
+[profile.release]
+lto = "thin"
+strip = "symbols"
+
+[profile.dev]
+opt-level = 0
+
+[profile.dev.package."*"]
+opt-level = 2

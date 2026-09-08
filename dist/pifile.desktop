@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=Pifile
+GenericName=File Manager
+Comment=Keyboard-first file manager
+Exec=pifile %f
+TryExec=pifile
+Icon=pifile
+Terminal=false
+StartupNotify=true
+Categories=System;FileTools;FileManager;
+MimeType=inode/directory;
+Keywords=files;folder;manager;
+StartupWMClass=pifile
