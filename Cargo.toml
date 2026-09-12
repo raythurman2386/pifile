@@ -1,6 +1,6 @@
 [package]
 name = "pifile"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license = "MIT"
 description = "A keyboard-first file manager built with GPUI Kit"
