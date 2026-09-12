@@ -47,6 +47,9 @@ jobs:
         run: cargo build --release --locked --target ${{ matrix.target }}
       - name: Package
         id: pkg
+        env:
+          TARGET: ${{ matrix.target }}
+          PREBUILT_BIN: target/${{ matrix.target }}/release/pifile
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           bash scripts/package-linux.sh
