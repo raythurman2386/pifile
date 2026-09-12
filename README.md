@@ -6,7 +6,18 @@ It is a directory browser. It does not special-case piwrite, picalc, raven, or h
 
 ## Install
 
-User-local install (binary, icon, launcher). No root:
+Netinstaller (recommended) — downloads the latest release, verifies its
+Ed25519 signature and SHA-256 checksum (a missing or bad signature refuses the
+install), then runs the bundled `install.sh`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/raythurman2386/pifile/main/scripts/netinstall.sh | sh
+# or a specific version:
+curl -fsSL https://raw.githubusercontent.com/raythurman2386/pifile/main/scripts/netinstall.sh | sh -s -- v0.1.0
+```
+
+User-local install from a checked-out repo (builds from source; binary, icon,
+launcher). No root:
 
 ```sh
 ./scripts/install.sh
