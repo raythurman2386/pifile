@@ -12,8 +12,9 @@ install), then runs the bundled `install.sh`:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/raythurman2386/pifile/main/scripts/netinstall.sh | sh
-# or a specific version:
-curl -fsSL https://raw.githubusercontent.com/raythurman2386/pifile/main/scripts/netinstall.sh | sh -s -- v0.1.0
+# or a specific version / prefix:
+curl -fsSL https://raw.githubusercontent.com/raythurman2386/pifile/main/scripts/netinstall.sh | sh -s -- 0.1.1
+curl -fsSL https://raw.githubusercontent.com/raythurman2386/pifile/main/scripts/netinstall.sh | sh -s -- --prefix /opt/pifile
 ```
 
 User-local install from a checked-out repo (builds from source; binary, icon,
@@ -32,12 +33,10 @@ pifile ~/Projects
 
 Uninstall with `./scripts/uninstall.sh`.
 
-Tagged releases (`v*`) build Linux x86_64 and aarch64 tarballs on GitHub Actions
-and publish them with a `checksums.txt`. Unpack the tarball for your
-architecture and run `./install.sh` inside.
-
-The prebuilt binaries target glibc 2.39+ (Ubuntu 24.04, Debian 12/13, Raspberry
-Pi OS). Older distros should build from source.
+Tagged releases (`v*`) build Linux tarballs on GitHub Actions for x86_64 and
+aarch64 (Raspberry Pi 5 and other 64-bit ARM boards), each requiring glibc
+2.39+ (Debian 13, Ubuntu 24.04, current Raspberry Pi OS). Unpack the tarball
+for your architecture and run `./install.sh` inside.
 
 ## Run from source
 

@@ -8,7 +8,12 @@ PREFIX="${PREFIX:-$HOME/.local}"
 cd "$ROOT"
 cargo build --release --locked
 
-install -Dm755 "$ROOT/target/release/pifile" "$PREFIX/bin/pifile"
+# target-dir may be overridden (e.g. shared cache in ~/.cargo/config.toml),
+# so ask cargo where the build actually landed instead of assuming target/.
+TARGET_DIR="$(cargo metadata --format-version 1 --no-deps | sed -n 's/.*"target_directory":"\([^"]*\)".*/\1/p')"
+[[ -n "$TARGET_DIR" ]] || { echo "install.sh: could not resolve cargo target directory" >&2; exit 1; }
+
+install -Dm755 "$TARGET_DIR/release/pifile" "$PREFIX/bin/pifile"
 install -Dm644 "$ROOT/dist/pifile.desktop" "$PREFIX/share/applications/pifile.desktop"
 install -Dm644 "$ROOT/LICENSE" "$PREFIX/share/licenses/pifile/LICENSE"
 if [[ -f "$ROOT/dist/pifile.svg" ]]; then
@@ -32,12 +37,6 @@ fi
 if command -v gtk-update-icon-cache >/dev/null 2>&1; then
   gtk-update-icon-cache -f -t "$PREFIX/share/icons/hicolor" >/dev/null 2>&1 || true
 fi
-if command -v xdg-mime >/dev/null 2>&1; then
-  xdg-mime default pifile.desktop inode/directory >/dev/null 2>&1 || true
-fi
 
-echo "Installed pifile to $PREFIX/bin/pifile"
-echo "Launcher: $PREFIX/share/applications/pifile.desktop"
-if [[ ":$PATH:" != *":$PREFIX/bin:"* ]]; then
-  echo "Add $PREFIX/bin to PATH if the launcher cannot find pifile."
-fi
+echo "Installed pifile into $PREFIX"
+echo "Run it with: pifile"

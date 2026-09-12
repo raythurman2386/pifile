@@ -10,19 +10,17 @@ env:
 
 jobs:
   build:
-    name: Build ${{ matrix.target }}
-    runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
       matrix:
         include:
           - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
+            runs-on: ubuntu-latest
           - target: aarch64-unknown-linux-gnu
-            # Native arm64 hosted runner (free for public repos). Removes the
-            # cross linker and any cross-compile risk with the GUI deps.
-            os: ubuntu-24.04-arm
-
+            # Native arm64 runner (free for public repos, Ubuntu 24.04,
+            # glibc 2.39) so GUI deps build without cross-compilation.
+            runs-on: ubuntu-24.04-arm
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.runs-on }}
     steps:
       - uses: actions/checkout@v7
       - uses: jlumbroso/free-disk-space@main
@@ -47,16 +45,23 @@ jobs:
         run: cargo build --release --locked --target ${{ matrix.target }}
       - name: Package
         id: pkg
-        env:
-          TARGET: ${{ matrix.target }}
-          PREBUILT_BIN: target/${{ matrix.target }}/release/pifile
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          bash scripts/package-linux.sh
+          TARGET="${{ matrix.target }}" \
+            PREBUILT_BIN="target/${{ matrix.target }}/release/pifile" \
+            bash scripts/package-linux.sh
           TARBALL="target/package/pifile-${VERSION}-${{ matrix.target }}.tar.gz"
           test -f "$TARBALL"
           echo "tarball=${TARBALL}" >> "$GITHUB_OUTPUT"
           echo "asset=$(basename "$TARBALL")" >> "$GITHUB_OUTPUT"
+      - name: Smoke test the packaged tarball
+        run: |
+          TARBALL="target/package/pifile-${GITHUB_REF_NAME#v}-${{ matrix.target }}.tar.gz"
+          TMPDIR="$(mktemp -d)"
+          trap 'rm -rf "$TMPDIR"' EXIT
+          tar -xzf "$TARBALL" -C "$TMPDIR"
+          PREFIX="$TMPDIR/prefix" "$TMPDIR"/pifile-*/install.sh
+          "$TMPDIR/prefix/bin/pifile" --version
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
