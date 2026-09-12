@@ -10,8 +10,19 @@ env:
 
 jobs:
   build:
-    name: Build linux-x86_64
-    runs-on: ubuntu-latest
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: aarch64-unknown-linux-gnu
+            # Native arm64 hosted runner (free for public repos). Removes the
+            # cross linker and any cross-compile risk with the GUI deps.
+            os: ubuntu-24.04-arm
+
     steps:
       - uses: actions/checkout@v7
       - uses: jlumbroso/free-disk-space@main
@@ -23,20 +34,23 @@ jobs:
           large-packages: true
           swap-storage: true
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: "1.97"
+          targets: ${{ matrix.target }}
       - name: Install Linux system deps
         run: bash scripts/ci-linux-deps.sh
       - name: Build release
-        run: cargo build --release --locked
+        run: cargo build --release --locked --target ${{ matrix.target }}
       - name: Package
         id: pkg
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           bash scripts/package-linux.sh
-          TARBALL="target/package/pifile-${VERSION}-x86_64-unknown-linux-gnu.tar.gz"
+          TARBALL="target/package/pifile-${VERSION}-${{ matrix.target }}.tar.gz"
           test -f "$TARBALL"
           echo "tarball=${TARBALL}" >> "$GITHUB_OUTPUT"
           echo "asset=$(basename "$TARBALL")" >> "$GITHUB_OUTPUT"

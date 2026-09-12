@@ -21,7 +21,12 @@ pifile ~/Projects
 
 Uninstall with `./scripts/uninstall.sh`.
 
-Tagged releases (`v*`) build a Linux x86_64 tarball on GitHub Actions. Unpack it and run `./install.sh` inside.
+Tagged releases (`v*`) build Linux x86_64 and aarch64 tarballs on GitHub Actions
+and publish them with a `checksums.txt`. Unpack the tarball for your
+architecture and run `./install.sh` inside.
+
+The prebuilt binaries target glibc 2.39+ (Ubuntu 24.04, Debian 12/13, Raspberry
+Pi OS). Older distros should build from source.
 
 ## Run from source
 
@@ -32,11 +37,10 @@ cargo run --release
 cargo run --release -- ~/Projects
 ```
 
-On a Raspberry Pi 500+ / Pi 5:
+On a Raspberry Pi 500+ / Pi 5 (or any arm64 Linux host):
 
 ```sh
-rustup target add aarch64-unknown-linux-gnu
-cargo build --release --target aarch64-unknown-linux-gnu
+cargo build --release
 ```
 
 ## Theme lookup
