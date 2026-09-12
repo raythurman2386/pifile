@@ -76,6 +76,27 @@ text-highlight color) is never used as a panel background.
 | Cancel prompt | `Escape` |
 | Quit | `Ctrl+Q` |
 
+## Release signing
+
+Releases are authenticated with Ed25519 signatures over `checksums.txt`, so a
+tampered release (or a look-alike from somewhere else) fails verification. The
+model keeps the secret key offline forever — it is never committed, never in
+CI, never uploaded:
+
+1. `scripts/gen-signing-key.sh` generates the keypair in `~/.pifile/signing`
+   (once, on the maintainer's machine). The public key is committed here as
+   `pifile-signing-key.pub` and pinned in the installer.
+2. After a release publishes, `scripts/sign-releases.sh v<version>` downloads
+   its `checksums.txt`, signs it offline with the secret key, and writes
+   `checksums.txt.sig` under `~/.pifile/signing/releases/<version>/`.
+3. `scripts/upload-release-sigs.sh v<version>` attaches the signature back to
+   the release (`gh release upload --clobber`). Signing and uploading stay
+   separate scripts so the secret key never touches a network call.
+
+The netinstaller verifies the signature against the pinned public key and
+refuses to install if it is missing or bad (fail closed), then checks the
+tarball's SHA-256 against the signed `checksums.txt`.
+
 Colors come from `~/.local/state/omarchy/current/theme/colors.toml` when present, then the other paths above.
 
 ## Scope
